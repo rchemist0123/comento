@@ -1,0 +1,415 @@
+---
+title: "data.table 기초"
+subtitle: "코멘토 실무PT 2주차"
+author: "Rchemist"
+
+format: 
+  revealjs:
+    # incremental: true
+    scrollable: true
+    smaller: true
+    css: style.css
+execute: 
+  freeze: auto
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(microbenchmark)
+```
+
+# 목차
+
+## 목차
+
+::: v-center-container
+-   과제 피드백
+
+-   `data.table` 소개
+
+    -   *vs* base R, `dplyr`
+
+-   `data.table` 함수 (1)
+
+    -   데이터 불러오기, 저장하기
+    -   변수명 설정
+
+-   data.table 문법
+
+    -   i: 행 (Row)
+    -   j: 열 (Column)
+    -   by: 집단 (Group by)
+
+-   data.table 함수 & 특수기호
+
+    -   함수
+    -   특수기호
+:::
+
+# `data.table` 소개
+
+## 1. data.table이란?
+
+::::: {.v-center-container}
+
+:::: {.columns}
+
+::: {.column width="70%"}
+기본 데이터 구조인 `data.frame`을 상속받은 패키지
+
+`data.frame`보다 더 간편하고 쉬운 문법
+
+:::
+
+::: {.column width="30%"}
+
+<img src="https://raw.githubusercontent.com/Rdatatable/data.table/master/.graphics/logo.png"/>
+
+:::
+
+::::
+
+:::::
+
+## `data.table`의 장점
+
+::: v-center-container
+-   매우 빠른 속도
+-   메모리 효율적
+-   간결한 문법과 코드
+
+-\> 큰 용량의 데이터 분석에 매우 유리
+:::
+
+## `data.table` vs 다른 패키지 문법
+
+::::: v-center-container
+
+:::: {.columns}
+
+base R vs `dplyr` vs `data.table`
+
+<br>
+
+::: {.column width="30%"}
+
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/R_logo.svg/1448px-R_logo.svg.png?20160212050515" style="width:50%;"/>
+
+-   순수 R 언어
+-   외부패키지 불필요
+
+:::
+
+::: {.column width="5%"}
+
+:::
+
+::: {.column width="30%"}
+
+<img src="https://dplyr.tidyverse.org/logo.png" style="width:50%"/>
+
+-   tidyverse 생태계의 대표 패키지
+-   파이프 연산자를 이용한 코드 작성
+-   사용자 친화적 함수
+
+:::
+
+::: {.column width="5%"}
+
+:::
+
+
+::: {.column width="30%"}
+<img src="https://raw.githubusercontent.com/Rdatatable/data.table/master/.graphics/logo.png" style="width:50%;"/>
+
+-   data.frame 계승
+-   간결한 문법, 구조
+-   빠른 속도
+-   패키지 의존성 없음
+
+:::
+
+::::
+
+:::::
+
+## `data.table` vs 다른 패키지 문법
+
+::: {.v-center-container}
+
+세 문법을 활용한 데이터 연산 속도 비교
+
+- 그룹별로 세 개의 열 평균을 계산하기
+
+```{r}
+#| echo: false
+set.seed(123)
+result <- microbenchmark(
+  baseR = aggregate(diamonds[,c("price", "depth","carat")],
+            by = list(diamonds$color, diamonds$cut),
+            FUN = mean),
+  dplyr= diamonds |>
+    group_by(color, cut) |> 
+    summarise(across(c(price, depth, carat), mean, na.rm=T)) |> 
+    ungroup(),
+  data.table = as.data.table(diamonds)[,.(mean_price = mean(price),
+                     mean_depth = mean(depth),
+                     mean_carat = mean(carat)), 
+                  by=.(color, cut)],
+  times=50
+)
+
+ggplot(result, aes(x=time/1000, y=expr, color=expr))+
+  geom_violin()+
+  geom_boxplot()+
+  scale_x_continuous(trans = 'log10', labels = scales::comma) +
+  theme_classic() +
+  theme(legend.position="none",
+        axis.text.y = element_text(size=12)) +
+  labs(x="Time", y="Exprs") 
+```
+:::
+
+# `data.table` 함수 (1)
+
+## 데이터 불러오기
+::: v-center-container
+-   데이터 불러오기: `fread()`
+-   데이터 저장하기: `fwrite()`
+
+```{r}
+# eval: false
+df <- fread("2주차_강의_데이터.csv")
+```
+
+:::
+
+## 열 이름 변경
+
+::: v-center-container
+
+`setnames(데이터, 이전 이름, 새 이름)`
+
+```{r}
+#| eval: false
+setnames(df, "HeartDisease","heart_disease")
+setnames(df, c("AlcoholDrinking","PhysicalActivity"),
+         c("alcohol_drinking","physical_activity"))
+```
+
+:::
+
+# `data.table`문법
+
+## 1. `i` : 행
+
+::: {.v-center-container}
+
+특정 조건에 맞는 행 선택 `data.frame`과 달리 `$` 사용 불필요
+
+-   관계연산자, 논리 연산자 사용
+
+```{r}
+#| eval: false
+df[heart_disease == "Yes"]
+```
+
+<br>
+
+```{r}
+#| eval: false
+df[BMI >= 25 & Smoking == "No"] 
+```
+
+<br>
+
+infix 연산자
+
+-   `%%` 붙은 연산자
+-   `%in%`, `%between%`, `%like%`
+
+```{r}
+#| eval: false
+df[GenHealth %in% c("Good","Very good")]
+df[BMI %between% c(25,30)] 
+df[Race %like% c("Am")]
+```
+:::
+
+## 행 정렬
+
+::: {.v-center-container}
+-   `order()` : 데이터 정렬 후 **출력**
+-   `setorder()`: 데이터 정렬 후 **저장**
+
+```{r}
+df[order(BMI)] |> head()
+```
+
+<br>
+
+```{r}
+setorder(df, BMI)
+```
+
+
+`setkey()`: 
+
+- 설정해주는 key를 바탕으로 데이터 정렬 (오름차순)
+- 설정하지 않았을 때보다 훨씬 빠르게 데이터 처리
+
+```{r}
+setkey(df, BMI)
+```
+
+:::
+
+## 2. `j` : 열
+
+::::: v-center-container
+
+:::: {.columns}
+
+::: {.column width="70%"}
+-   열 선택 및 계산
+-   j 부분에서 함수 사용
+
+```{r}
+#| eval: false
+df[, .(BMI, Stroke, Sex )] # 열 선택
+
+df[, .(mean_bmi = mean(BMI))] # 열 계산
+```
+
+<br>
+
+- `:=`: walrus (바다코끼리) 연산자 - 특정 열을 **생성, 변경, 삭제** 시 사용
+
+```{r}
+df[,obese := ifelse(BMI >= 25, 
+                    "obese", 
+                    "normal")]
+```
+<br>
+
+- 여러 개의 열 동시 다루기 `':='`
+
+```{r}
+df[, ':=' (
+ obese = ifelse(BMI >= 25, 
+                    "obese", 
+                    "normal"),
+ obese2 = ifelse(BMI >= 35, "초고도비만",
+             ifelse(BMI >= 30, "고도비만",
+                ifelse(BMI >= 25,"비만", "정상")))
+)]
+```
+
+:::
+
+::: {.column width="30%"}
+
+
+<img src="https://www.wwf.org.uk/sites/default/files/styles/hero_s/public/2019-04/Cape%20Sedtse-Kamen%20%28C%29%20Anatoly%20Kruchnev%20%281%29.JPG?h=7685ba0d&amp;itok=f4DQojay"/>
+
+:::
+
+::::
+
+:::::
+
+## 3. `by`: 그룹 계산
+
+::: {.v-center-container}
+
+-   그룹별로 특정 열(column) 계산 $\rightarrow$ 반드시 J가 선언되어야 함
+-   `mean()`, `sum()`과 같은 요약함수를 이용
+-   e.g., 성별에 따른 평균 나이, 연령대별 평균 BMI
+
+```{r}
+df[,.(mean_bmi = mean(BMI)), by=Race]
+```
+
+<br>
+
+-   `keyby`: 그룹별로 계산한 뒤, 그룹열을 기준으로 정렬 (정렬된 데이터가 약간 빠름)
+
+```{r}
+df[,.(mean_bmi = mean(BMI)), keyby=Race]
+```
+
+:::
+
+# `data.table` 함수 & 특수 기호
+
+## 함수
+
+::: {.v-center-container}
+
+`nafill()` - 결측치 (`NA`)를 채움
+
+```{r}
+#| eval: false
+df[,BMI := nafill(BMI, fill=10)]
+```
+<br>
+
+`fcase()`
+
+-   `ifelse()`를 여러 번 사용할 필요 없이 하나의 함수 사용
+-   `default`로 나머지 적용
+
+```{r}
+df[,obese := fcase(BMI >= 35,"초고도비만",
+                   BMI >= 30, "고도비만",
+                   BMI >= 25, "비만",
+                   BMI >= 23, "과체중",
+                   default = "정상")]
+```
+:::
+
+## 함수
+
+::: {.v-center-container}
+
+`uniqueN()`
+
+-   특정 열의 고유한 데이터 파악
+-   주로 id 열의 고유한 N수 파악 위해 사용
+
+```{r}
+df[,uniqueN(AgeCategory)]
+```
+:::
+
+## 특수기호
+
+::: {.v-center-container}
+
+`.N`
+
+-   행의 길이 파악
+-   (일반적으로) by와 함께 사용
+
+```{r}
+df[,.N, by=Sex]
+```
+
+`.I`
+
+- 행의 조건을 활용해 j부분에서 다룸
+- 조건에 맞는 행의 번호를 출력
+
+```{r}
+#| eval: false
+df[,.I[1L], by=Race]
+df[,.I[which.min(BMI)], by=Race]
+```
+
+
+:::
+
+

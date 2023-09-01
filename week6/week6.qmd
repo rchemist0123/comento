@@ -1,0 +1,263 @@
+---
+title: "Week 6. Data visualization"
+author: "Rchemist"
+format: 
+  revealjs:
+    incremental: true
+    scrollable: true
+    smaller: true
+    
+execute: 
+  freeze: auto
+---
+
+```{r include=FALSE}
+library(ggplot2)
+library(data.table)
+library(ggthemes)
+library(ggsci)
+knitr::opts_chunk$set(echo = TRUE,comment=NA,
+                       warning=FALSE, dpi=300, fig.align="center",fig.pos="H")
+```
+
+```{css, echo = FALSE}
+.justify {
+  text-align: justify !important;
+}
+
+.myColumns {
+  display: flex !important; 
+  height: 80%;
+}
+
+.myColumn {
+  display: flex;
+  justify-content: left; 
+  align-items: center;
+}
+
+```
+
+## 목차
+
+::::: {.myColumns}
+
+::: {.myColumn}
+
+- `ggplot2`: Data visualization
+  - 기본 문법
+  - 그래프 종류
+- Review
+
+:::
+
+:::::
+
+# ggplot2 소개
+
+
+## 기본 문법
+
+`ggplot2`: R의 대표적인 데이터 시각화 패키지
+
+```{r}
+#| eval: false
+#| code-line-numbers: "|1|2-3|4-5|6|7|8-9|10|11-13|14|"
+as.data.table(diamonds)[,.(mean_price = mean(price)),by=.(cut,color)] |> 
+  ggplot(mapping=aes(x= reorder(cut,-mean_price),
+                     y=mean_price)) +
+  geom_col(aes(fill=color), 
+           position = position_dodge())+
+  theme_classic() +
+  scale_fill_brewer(palette = 'Paired', direction=-1) +
+  scale_x_discrete() + # or scale_x_continuous() 
+  scale_y_continuous() +
+  theme(legend.position = 'top') +
+  labs(x='Diamonds cut', y='Mean price($)', 
+       title = 'Mean price of diamonds according to Cut',
+       fill='Type') +
+  facet_grid(~color)
+```
+
+# 그래프의 종류
+
+## bar plot 
+
+범주 별 요약 값 시각화 
+```{r}
+#| output-location: column-fragment
+as.data.table(diamonds)[,.(mean_price = mean(price)),by=.(cut,color)] |> 
+  ggplot(mapping=aes(x= reorder(cut,-mean_price),
+                     y=mean_price
+  ))+ # 막대 그래프의 막대 색상을 채워넣는 것은 fill
+  # geom_bar(stat = 'identity')
+  geom_col(aes(fill=color), 
+           position = position_dodge())+
+  # theme_stata()
+  theme_classic()+
+  theme(legend.position = 'top') +
+  labs(x='Diamonds cut', y='Mean price($)', 
+       title = 'Mean price of diamonds according to Cut',
+       fill='Type') +
+  scale_fill_brewer(palette = 'Paired', direction=-1)
+```
+
+
+## histogram & density plot
+
+데이터의 분포 시각화
+```{r}
+#| output-location: column-fragment
+ggplot(data=diamonds, 
+       aes(x=price,fill=cut)) + 
+  geom_histogram(aes()) +
+  # theme_wsj() +
+  theme_few() +
+  facet_grid(cut~.) +
+  theme(axis.title.x = element_text(size=10, 
+                                    face = 'italic',
+                                    family = 'serif'),
+        axis.text.y= element_text(size=10, 
+                                  colour = 'red', 
+                                  angle = 45),
+        legend.position = 'none')
+```
+
+
+## scatter plot
+
+두 연속형 변수 간 관계 시각화 
+```{r}
+#| output-location: column-fragment
+ggplot(data=diamonds,
+       aes(x=price, y=carat, color=cut))+ # color
+  geom_point() +
+  geom_smooth(method='lm', formula = y~poly(x,3)) +
+  theme_classic()
+```
+
+
+## box plot
+
+상자 그림
+데이터의 분포 + 4분위수, 이상치 
+```{r}
+#| output-location: column-fragment
+ggplot(data=diamonds,
+       aes(x=cut, y=price))+
+  geom_boxplot(aes(fill=cut,color=cut)) +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+
+## line plot
+
+범주 별 관계 표현
+X축: 날짜, 시간 
+```{r}
+#| output-location: column-fragment
+as.data.table(diamonds)[,.(mean_price = mean(price)),by=.(cut,color)] |> 
+  ggplot(aes(x=cut, y=mean_price, group=color, color=color))+
+  geom_point()+
+  geom_line()+
+  theme_bw() +
+  scale_color_canva() 
+```
+
+
+# 복습
+
+## R basic
+  
+::::: {.myColumns}
+
+::: {.myColumn}
+
+  - 데이터 유형
+    - numeric, character, factor, logical, date ...
+  - 데이터 구조
+    - vector, matrix, list, data.frame
+  - 연산자
+    - 산술 연산자, 논리 연산자, 파이프 연산자
+  - 함수
+
+:::
+
+:::::
+
+## `data.table`
+
+::::: {.myColumns}
+
+::: {.myColumn}
+
+::: {.nonincremental}
+  - i, j, by
+  - `.SD`, `.SDcols` + `lapply()`
+  - join: inner, left/right, full
+  - pivoting: `melt()`, `dcast()`
+  
+:::  
+
+:::
+
+:::::
+
+## 통계 분석
+
+::::: {.myColumns}
+
+::: {.myColumn}
+
+::: {.nonincremental}
+
+  - 집단 간 차이 검정
+    - `t.test()`
+    - `anova()`
+    - `chisq.test()`
+    - `mytable()`
+    - 사후 검정(Post Hoc Test)
+  - 회귀 분석
+    - 선형 회귀분석
+    - 로지스틱 회귀분석
+  - 생존 분석
+    - `survival`, `survminer`
+    - Kaplan-Meier Curve
+    - Cox regression
+    
+:::
+
+:::
+
+:::::
+
+## 유용한 패키지
+
+::::: {.myColumns}
+
+::: {.myColumn}
+
+  - `stringr`: Regular expression
+  - `mice()`: Multiple Imputation by Chained Equation
+  - `gtsummary()`: summary, regression table
+
+:::
+
+:::::
+
+## 독학 하시는 분들을 위한 팁
+
+::::: {.myColumns}
+
+::: {.myColumn}
+
+- No Naver, With Google ([stackoverflow](https://stackoverflow.com/))
+- SQL (Structured Query Language)
+  - Database를 다루기 위한 언어
+  - 대용량 데이터를 다룰 때 반드시 필요
+- 더 많은 호기심: 다양한 패키지, 함수 등
+
+:::
+
+:::::

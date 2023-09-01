@@ -1,0 +1,296 @@
+---
+title: "필수 통계 분석"
+subtitle: "코멘토 실무PT 4주차"
+author: "Rchemist"
+code-annotations: below
+format: 
+  revealjs:
+    code-overflow: wrap
+    code-copy: false
+    scrollable: true
+    smaller: true
+    css: style.css
+
+execute: 
+  freeze: auto
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(survival)
+library(survminer)
+df <- fread("4주차_수업데이터.csv")
+```
+
+# 목차
+
+
+## 목차
+
+::: v-center-container
+
+-  과제 피드백
+
+-  집단 간 차이 검정
+
+    - T-test
+    - ANOVA
+    - Chi-square
+    
+-  회귀 분석
+
+    - 선형 회귀 분석
+    - 로지스틱 회귀분석
+    
+-  생존 분석
+
+    - 생존 분석의 개념
+    - 집단 간 생존률 차이 비교
+    - 생존률에 영향을 미치는 요인 분석
+
+:::
+
+# 집단 간 차이 검정
+
+## 1. T-test
+
+::: v-center-container
+
+- **두 개의 범주**로 이루어진 집단에서 연속형 변수가 차이가 있는지 확인
+
+- 예시: 성별에 따른 BMI 차이, 65세 미만과 65세 이상 간의 심장질환 발생률의 차이
+
+```{r}
+with(df,
+     t.test(systolic_blood_pressure ~ sex))
+```
+:::
+
+## 2. ANOVA
+
+::: v-center-container
+- 분산 분석 (Analysis of Variance)
+- 세 개 이상의 범주로 이루어진 집단에서 연속형 변수가 차이가 있는지 확인
+- 예시: 연령대별 또는 ICU 병동별 vital sign 비교
+- `aov()`, `anova()`
+```{r}
+df[,age_g := fcase(age<40,"30", age<50,"40",
+                   age<60,"50", age<70,"60",default="over70")]
+with(df,
+     aov(heart_rate ~ age_g) |> summary())
+```
+<br>
+
+- 어떤 집단 간 차이가 유의미한지 확인 필요.
+- `pairwise.t.test()`
+
+```{r}
+with(df,
+    pairwise.t.test(x = heart_rate,
+                    g = age_g,
+                    p.adjust.method = "bonferroni"))
+```
+
+:::
+
+## 3. Chi-square test
+
+::: v-center-container
+
+- 2개 이상의 범주로 이루어진 범주형 변수들 간 응답 분포의 차이 비교
+- 각 응답 분포가 5 이상이어야 함
+
+```{r}
+with(df,
+     chisq.test(sex, age_g))
+```
+
+:::
+
+## 4. `mytable()`
+
+- `moonBook` 패키지 통해 범주별 차이 확인 가능
+- `mytable(집단 ~ 변수1 + 변수2 + ...,  data)`
+
+```{r}
+library(moonBook)
+mytable(sex ~ 
+          age + 
+          heart_rate + 
+          respiratory_rate + 
+          systolic_blood_pressure + 
+          diastolic_blood_pressure+
+          oxygen_saturation + 
+          temperature +
+          wbc + rbc + 
+          admission_disposition, df)
+```
+
+
+# 회귀 분석
+
+## 1. 선형 회귀 분석
+
+::: v-center-container
+
+- 종속 변수(Y)가 연속형(숫자)
+- 독립 변수가 한 개: 단순(univariable) 회귀분석
+- 독립 변수가 여러 개: 다중 (multivariable) 회귀분석
+- `lm()`
+
+```{r}
+fit <- lm(heart_rate ~ age + sex + systolic_blood_pressure + diastolic_blood_pressure, df)
+
+summary(fit)
+```
+
+:::
+
+## 2. 로지스틱 회귀 분석
+
+::: v-center-container
+
+- 종속 변수(Y)가 이분 범주형(0,1)
+- `glm()`
+- `family = binomial()`
+```{r}
+df[,death := ifelse(death=="Yes",1,0)]
+glm_fit <- glm(death ~ age + sex, family=binomial(),data=df)
+```
+<br>
+
+- 결과해석: Odds ratio (OR)
+- `moonBook` 패키지의 `extractOR()`
+```{r}
+extractOR(glm_fit)
+```
+
+
+:::
+
+# 생존 분석
+
+## 생존 분석의 개념
+
+::: v-center-container
+
+- 생존분석(survival analysis): 사건-시간분석(time to event analysis)
+- 사건의 발생과 사건 발생까지의 시간을 고려하여 사건의 발생의 위험요인을 분석하는 통계방법
+- 사건: 사망, 질병의 발생 등
+
+![](survival_concept.png)
+:::
+
+
+# 생존 분석의 유형
+
+## 1. 집단 간 생존률 차이 비교
+
+::: v-center-container
+
+- 시간의 흐름에 따른 생존 변화 여부를 전체 또는 집단별로 비교
+- **Kaplan-Meier Curve**를 통해 시각화
+- log-rank test: 집단 간 생존율을 비교하는 지표
+- 3개 이상의 범주일 경우 사후분석 진행
+
+```{r}
+#| echo: false
+library(survival)
+library(survminer)
+surv_fit <- survfit(Surv(time, status) ~ ph.ecog, lung)
+ggsurvplot(surv_fit, pval=T)
+```
+:::
+
+## 2. Cox 회귀분석
+
+::: v-center-container
+
+- 사건 발생에 영향을 미치는 여러 가지 변수들을 투입하여 **생존율(사망률)**에 미치는 영향력 파악.
+- 로지스틱 회귀분석과 비슷한 개념, but **시간(관찰기간)**이 추가됨.
+각 변수들이 결과에 미치는 영향력을 HR (hazard ratio)라는 수치로 나타낼 수 있음.
+- 비례위험 가정 (proportional hazard assumption): 시간의 흐름과 관계없이 위험비가 일정해야 함.
+
+:::
+
+# 생존 분석 수행하기
+
+## 1. 날짜/시간 계산
+
+::: v-center-container
+
+- `as.Date(문자열, 형식)`: 날짜(Date)로 변경
+- `as.POSIXct(문자열, 형식)`: 날짜 + 시간(datetime)으로 변경
+- 연도(`%Y`), 월(`%m`), 일(`%d`)
+- 시간(`%H`), 분(`%M`) 초(`%S`)
+```{r}
+as.Date("2023-05-10")
+as.Date("20230510", "%Y%m%d")
+
+as.POSIXct(strptime("20230510 190000","%Y%m%d %H%M%S") )
+```
+<br>
+
+- `difftime(time1, time2, units)`: 두 시간대의 시간 차이를 계산
+
+```{r}
+# 크리스마스까지 남은 일수
+difftime("2023-12-25", "2023-05-10", units="days")
+```
+
+:::
+
+## 2. 집단 간 생존률(사망률) 차이 비교
+
+::: v-center-container
+
+- `survival` 패키지
+- `survfit()`, `survdiff()` 함수 이용
+- `survminer` 패키지 이용한 시각화
+
+```{r}
+library(survival)
+library(survminer)
+surv_fit <- survfit(Surv(time, status) ~ sex, lung)
+ggsurvplot(surv_fit)
+```
+
+:::
+
+## 3. Cox 회귀분석
+
+::: v-center-container
+
+- `survival` 패키지를 이용
+- `coxph(Surv(관찰기간, 종속변수) ~ 독립변수, data)`
+- 다양한 함수를 통해 결과 요약
+- `survminer` 패키지 이용한 시각화
+
+```{r}
+lung$ph.ecog <- as.factor(lung$ph.ecog)
+cox_fit <- coxph(Surv(time, status) ~ sex + age +
+                   ph.ecog, lung)
+cox_fit
+```
+
+:::
+
+## 3. Cox 회귀분석
+
+::: v-center-container
+결과해석
+
+-  `summary()`
+-  `extractHR()` in `moonBook`
+-  `ggforest()` in `survminer`
+
+```{r}
+ggforest(cox_fit)
+```
+
+:::
+
+

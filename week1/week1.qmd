@@ -1,0 +1,472 @@
+---
+title: "R 기초 및 필수 익히기"
+subtitle: "코멘토 실무PT 1주차"
+author: "Rchemist"
+
+format: 
+  revealjs:
+    # incremental: true
+    scrollable: true
+    smaller: true
+    css: style.css
+    
+execute: 
+  freeze: auto
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+
+# 목차 
+
+## 목차
+
+::: {.v-center-container}
+
+-   R 기초 개념
+    
+    - object (객체)
+    - function (함수)
+    - working directory (작업경로)
+    - package (패키지)
+    
+-   데이터의 유형
+
+    -   numeric, character, factor, logical
+
+-   데이터의 구조
+
+    -   vector, matrix, data.frame, list
+
+-   연산자
+
+    -   수학 연산자, 관계 연산자, 논리 연산자, 파이프 연산자
+
+-   함수
+
+    - 요약 함수, 구조 함수, 형태 변환 함수, 논리 함수, 조건 함수
+
+:::
+
+# 1. R 기초 개념
+
+## 1) Object
+
+::: { .v-center-container}
+
+객체. 어떤 데이터를 저장하는 값.
+
+- 외부의 특정 데이터를 불러와서 사용할 때
+- 분석 결과들을 **저장**할 때
+- 데이터를 생성 또는 변경한 뒤 저장할 때
+
+- object 생성: `object이름 <- 데이터`
+- 단축키: `alt` + `-`
+
+```{r}
+intro <- "Welcome to R!"
+intro
+```
+<br>
+
+```{r}
+# OR
+print(intro)
+```
+
+:::
+
+## 2) Function
+
+::: { .v-center-container}
+
+- 특정 기능을 수행하는 명령어
+- 함수 뒤에는 `()`가 붙음
+```{r}
+print <- "프린트하세요."
+print(print)
+```
+<br>
+
+- `print`: Object
+- `print()`: function
+
+:::
+
+## 2) Function
+
+::: { .v-center-container}
+- `?함수()`: 도움말
+<br>
+```{r}
+#| eval: false
+?print()
+```
+
+:::
+
+## 3) Working directory
+
+::: { .v-center-container}
+
+- 작업 경로
+- 현재 RStudio가 작동하고 있는 경로
+- 작업경로 확인
+<br>
+```{r}
+getwd() # get WD
+```
+<br>
+- 작업경로 설정
+```{r}
+#| eval: false
+setwd("new/directory") # set WD 
+```
+
+:::
+
+## 4) 패키지
+
+::: { .v-center-container}
+
+- 특정한 함수들을 포함하고 있는 함수 세트
+- 다양한 기능의 함수들 사용 가능
+
+- `install.packages()`: 패키지 설치
+- 패키지 이름은 항상 `""` 붙여야 함
+```{r}
+#| eval: false
+install.packages("package")
+```
+<br>
+
+- `library()`: 패키지 불러오기
+- 패키지 이름에 `""` 붙일 필요 없음
+```{r}
+#| eval: false
+library(package)
+```
+
+:::
+
+# 2. 데이터의 유형
+
+## 1) numeric
+
+::: { .v-center-container}
+
+- 숫자 데이터
+- 정수, 실수 모두 포함하는 개념
+```{r}
+number <- 22
+number2 <- 3.14
+
+class(number); class(number2)
+```
+
+:::
+
+## 2) character
+
+::: { .v-center-container}
+
+- 문자 데이터
+- 따옴표(`""` 또는 `''`)
+```{r}
+chr <- "RRRR"
+chr
+```
+
+:::
+
+## 3) factor
+
+::: { .v-center-container}
+
+- 범주 데이터
+```{r}
+fruits <- c("apple","banana","orange")
+
+fruits_fct <- factor(fruits)
+print(fruits_fct)
+```
+<br>
+
+- `orderd=TRUE`: 순서 부여
+
+```{r}
+medals <- c("bronze","silver","gold")
+
+medals_fct <- factor(medals,
+                     levels=c("gold","silver","bronze"), ordered = TRUE)
+
+print(medals_fct)
+```
+
+:::
+
+## 4) logical
+
+::: { .v-center-container}
+
+- 논리형 데이터
+- `TRUE` & `FALSE`
+- 조건 확인 시 출력되는 결과들
+```{r}
+TRUE; T
+FALSE; F
+```
+
+:::
+
+# 3. 데이터의 구조
+
+## 1) vector (벡터)
+
+::: { .v-center-container}
+
+- 1차원 데이터
+- `c()`를 통해 데이터를 묶음
+```{r}
+numbers <- c(1:10)
+numbers
+```
+<br>
+
+- 연속적인 값들은 콜론(`:`) 사용 가능
+```{r}
+numbers2 <- 101:110
+numbers2
+```
+
+:::
+
+## 2) matrix (매트릭스)
+
+::: { .v-center-container}
+
+- 행과 열을 갖는 2차원 데이터
+- 행 또는 열의 개수 지정
+- 하나의 데이터 유형만 가질 수 있음
+
+```{r}
+mat <- matrix(1:20, nrow=5)
+mat
+```
+<br>
+
+- `byrow=TRUE`: 행 단위로 입력
+```{r}
+mat2 <- matrix(letters[1:20], nrow=5, byrow=TRUE)
+mat2
+```
+
+:::
+
+## 3) data.frame (데이터프레임)
+
+::: { .v-center-container}
+
+- 데이터 분석을 위해 가장 많이 활용하는 데이터 구조
+- 열 (column) 단위로 작업 진행
+- 모든 열은 동일한 길이를 가져야 함
+- 외부 데이터를 `data.frame`으로 저장하여 사용
+- `matrix`와 차이점 존재 
+    -  `$`로 열 접근 가능
+    -  각 열마다 다른 유형의 데이터
+
+:::
+
+## 행 (row) 
+
+::: { .v-center-container}
+
+- `data[행번호,]` 또는 `data[행조건,]`구조
+- 특정 데이터를 추출(filtering)
+```{r}
+iris[1,]
+```
+
+:::
+
+## 열 (column)
+
+::: { .v-center-container}
+
+- data[,`열이름(번호)`] 구조
+- `$`를 이용하여 열 이름으로 조회
+- 열 생성, 변경, 삭제 등
+```{r}
+#| eval: false
+iris[,2]
+iris$Species
+```
+
+:::
+
+## 4) list
+
+::: { .v-center-container}
+
+-  df의 열처럼 각각의 이름을 가짐
+-   각 이름마다 다른 유형, 다른 구조의 데이터, 다른 길이 가능.
+
+```{r}
+l <- list() # 빈 리스트 생성성
+l$a <- 1:5
+l$b <- LETTERS # 알파벳 대문자
+l$c <- matrix(1:20,nrow=4, byrow=T)
+l$d <- data.frame(a=1:5, b=letters[1:5])
+l
+```
+
+:::
+
+# 4. 연산자
+
+## 1) 수학 연산자
+
+::: { .v-center-container}
+
+- 사칙연산: `+`,`-`,`*`,`/`
+- `%/%` (몫), `%%` (나머지)
+- `^` (제곱)
+```{r}
+#| eval: false
+10^2 # 100
+10 %/% 2 # 5
+10 %% 3 # 1
+```
+
+:::
+
+## 2) 관계 연산자
+
+::: { .v-center-container}
+
+A와 B의 관계 비교. (`TRUE` 아니면 `FALSE`)
+
+- `A == B` : A와 B가 같은가? 
+- `A != B` : A가 B와 다른가?
+- `A >= B` : A가 B보다 크거나 같은가?
+- `A > B` : A가 B보다 큰가?
+- `A < B` : A가 B보다 작은가?
+- `A <= B` : A가 B보다 작거나 같은가?
+```{r}
+10 == 10; 10 != 10
+```
+
+:::
+
+## 3) 논리 연산자
+
+::: { .v-center-container}
+
+- `A & B`: AND
+- 두 가지 조건 모두 만족해야 `TRUE`
+```{r}
+a <- 10
+b <- 10
+
+a == 10 & b == 10
+a == 10 & b == 20
+```
+<br>
+
+- `A | B`: OR
+- 두 가지 조건 중 하나만 만족하면 `TRUE`
+```{r}
+a <- 10
+b <- 10
+
+a == 10 | b == 10
+a == 10 | b == 20
+```
+
+:::
+
+## 4) 파이프 연산자
+
+::: { .v-center-container}
+
+- 코드의 끊김 없이 흐름 파악
+- `%>%`: 외부 패키지(`dplyr`, `magrittr`) 통해 사용 가능
+- R 4.1  이후 `|>` 가능
+```{r}
+head(iris)
+iris |> head()
+```
+
+:::
+
+# 5. 함수
+
+## 1) 요약 함수
+
+::: { .v-center-container}
+
+데이터를 요약할 때 사용
+
+- `mean()`, `sum()`, `min()`, `max()`, `sd()`, `median()` 등
+```{r}
+mean(1:100)
+```
+<br>
+
+- `table()`, `prop.table()`: 빈도 확인
+```{r}
+table(iris$Species)
+```
+
+:::
+
+## 2) 구조 함수
+
+::: { .v-center-container}
+
+데이터 프레임 등 특정 데이터 구조를 확인
+
+- `summary()`: 데이터프레임 요약
+- `str()`: 데이터프레임 구조
+- `head()`, `tail()`: 데이터프레임 처음 또는 끝 부분
+- `length()`: 데이터의 길이 확인
+- `View()`: 데이터프레임 전체 살펴보기
+
+:::
+
+## 3) 형태 변환 함수
+
+::: { .v-center-container}
+
+데이터의 유형이나 구조를 변환
+
+- `as.numeric()`, `as.character()`, `as.factor()`
+- `as.matrix()`, `as.data.frame()`
+
+:::
+
+## 4) 논리 함수
+
+::: { .v-center-container}
+
+`TRUE` 또는 `FALSE` 반환 함수
+
+- `is.numeric()`, `is.character()`, `is.factor()`
+- `is.na()`: 결측치(`NA`) 여부 확인
+
+:::
+
+## 5) 조건 함수
+
+::: { .v-center-container}
+
+- `ifelse(조건, Yes, No)`
+- 특정 조건이 참일 때, 나머지 구분
+
+```{r}
+ifelse(iris$Sepal.Length >= 5, "Long","Short") |> table()
+```
+
+:::

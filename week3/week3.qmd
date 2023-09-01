@@ -1,0 +1,267 @@
+---
+title: "data.table 심화"
+subtitle: "코멘토 실무PT 3주차"
+author: "Rchemist"
+code-annotations: below
+format: 
+  revealjs:
+    code-overflow: wrap
+    code-copy: false
+    scrollable: true
+    smaller: true
+    css: style.css
+
+execute: 
+  freeze: auto
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+library(data.table)
+library(ggplot2)
+library(dplyr)
+```
+
+# 목차
+
+
+## 목차
+
+::: v-center-container
+
+-   과제 피드백
+
+-  `lapply()` + `.SD`
+
+    -   `.SD` & `.SDcols`
+    -   `lapply()`
+
+-   `bind()`, `merge()`: 데이터 합치기
+
+    -   `rbind()`, `cbind()`, `rbindlist()`
+    -   `merge()`
+
+-   pivoting
+    -   pivoting 이란?
+    -   `melt()`: wide to long
+    -   `dcast()`: long to wide
+
+:::
+
+# lapply + .SD
+
+## 1. .SD & .SDcols이란?
+
+::: v-center-container
+
+`.SD`: subset of data.table
+
+- `data.table`의 일부분 선택하기 위한 특수기호
+- `.SDcols`와 함께 사용하여 특정 열 선택
+ 
+```{r}
+as.data.table(iris)[,.SD] |> head()
+```
+<br>
+
+`.SDcols`: 열 선택
+
+- 열 이름 직접 입력
+- 패턴을 통한 규칙 찾기
+
+```{r}
+#| eval: false
+as.data.table(iris)[,.SD, .SDcols=c("Sepal.Length","Species")] |> head()
+
+as.data.table(iris)[,.SD,.SDcols=patterns("Sepal")]
+```
+
+:::
+
+## `lapply()`
+
+::: v-center-container
+- 여러 값에 대해 일괄적으로 함수 적용
+- `function(x)` = `\(x)`
+```{r}
+#| eval: false
+lapply(1:5, function(x) x^2)
+lapply(1:5, \(x) x^2)
+```
+<br>
+
+- 함수 부분에 사용되는 값의 수에 따라 조절
+```{r}
+#| eval: false
+lapply(iris[,1:4], mean, na.rm=T) 
+lapply(iris[,1:4], \(x) ifelse(is.na(x), mean(x, na.rm=T),x)) 
+```
+:::
+
+## `lapply()` + `.SD`
+
+::: v-center-container
+
+- 특정 열을 선택하여 (.SD) + 일괄적 함수 적용 (`lapply()`)
+- 여러 변수의 형태를 한번에 변경 (e.g., as.factor())
+- 여러 변수의 요약 통계량 한번에 계산
+
+```{r}
+as.data.table(iris)[,lapply(.SD, mean), .SDcols = patterns("Petal")]
+```
+
+:::
+
+# 데이터 합치기
+
+## bind
+
+::: v-center-container
+
+`rbind()`
+
+- row-bind
+- 행 합치기 (위-아래)
+
+```{r}
+rbind(iris[1:10,], iris[141:150,])
+```
+
+`cbind()` 
+
+- column-bind
+- 열 합치기 (좌-우)
+```{r}
+cbind(iris$Sepal.Length, iris$Sepal.Width) |> head()
+```
+
+:::
+
+## join
+
+::: v-center-container
+
+- 특정 키(key)를 중심으로 두 데이터 병합 (e.g. 개인식별자)
+- 합치는 방식에 따른 구분
+- `merge()` 함수 사용
+
+:::
+
+## 1. inner join
+
+::: v-center-container
+
+- 두 데이터에서 공통되는 key만 합치기
+
+```{r}
+#| eval: false
+merge(df1, df2, by="키")
+```
+<br>
+
+- key가 다를 경우
+```{r}
+#| eval: false
+merge(df1, df2, by.x="a", by.y = "A")
+```
+
+![](https://i.postimg.cc/LsrVc8WF/inner-join.gif)
+:::
+
+## 2. left / right join
+
+:::: v-center-container
+
+- 두 데이터에서 왼쪽(left)/오른쪽(right) 키 기준으로 합치기
+- 다른 데이터에 없는 경우는 `NA` 처리
+
+::: panel-tabset
+
+## Left join
+```{r}
+#| eval: false
+merge(df1, df2, by=x, all.x = TRUE)
+```
+
+![](https://i.postimg.cc/T2nkXnG7/left-join.gif)
+
+
+## Right join
+
+```{r}
+#| eval: false
+merge(df1, df2, by=x, all.y = TRUE)
+```
+
+![](https://i.postimg.cc/VLHVkmr5/right-join.gif)
+:::
+
+::::
+
+# Pivoting
+
+## Pivoting 이란?
+
+::: v-center-container
+
+![](pivot_definition.png){width=40%}
+:::
+
+## Pivoting 이란?
+
+::: v-center-container
+
+- 특정 열을 중심으로 데이터를 회전시키는 것
+- 넓은(**wide**) 데이터: 여러 열이 옆으로 붙어 있는 형태
+- 긴(**long**) 데이터: 특정 열의 반복측정된 값이 위아래로 길게 나열된 형태
+
+![](pivot.png){width=40%}
+
+:::
+
+## `melt()`
+
+::: v-center-container
+
+- wide to long
+- 여러 열을 variable과 value로 형태변경
+```{r}
+#| eval: false
+#| code-line-numbers: "|1|2|3|4-5|"
+melt(DT,            # 데이터
+     id.vars,       # 키 column
+     measure.vars,  # 길게 변환할 column들
+     variable.name, # 길게 변환 후 변수이름 column의 이름
+     value.name     # 길게 변환 후 값 column 의 이름
+     )
+```
+
+:::
+
+## `dcast()`
+
+::: v-center-container
+
+- long to wide
+- 특정 열들을 요약하여 넓게 펼침
+- 하나의 key 값에 여러 값 존재 -> 요약함수 사용
+```{r}
+#| eval: false
+#| code-line-numbers: "|1|2|3|4|5"
+dcast(DT, 
+      formula = id ~ variable, # 기준 column ~ column 이름
+      value.var, # 채워넣을 값의 column 이름
+      fun.aggregate, # 요약함수
+      fill # NA일 경우 채워넣을 값
+      )
+```
+
+:::
+
+## melt & dcast 요약
+
+::: v-center-container
+
+![](melt_figure.png){width=70%}
+
+:::

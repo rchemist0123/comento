@@ -1,0 +1,392 @@
+---
+title: "실무에 유용한 R 패키지"
+author: "Rchemist"
+format: 
+  revealjs:
+    # incremental: true
+    scrollable: true
+    
+execute: 
+  freeze: auto
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,comment=NA,
+                       warning=FALSE, dpi=300, fig.align="center",fig.pos="H")
+```
+
+## 목차
+
+-   정규표현식
+    - 정규표현식의 개념
+    - 정규표현식 규칙
+    - 정규표현식 패키지 및 함수
+-   MICE
+    -   MICE 개념
+    -   MICE 활용
+-   `gtsummary`
+    -   Baseline characteristics table
+    -   Regression table
+    -   Merge tables
+
+# 1. 정규표현식
+
+## 정규표현식의 개념
+
+-   Regular Expression (`regex` or `regexp`)
+-   특정한 규칙을 가진 문자열의 집합을 표현하는 데 사용하는 형식 언어
+
+## 정규표현식 규칙
+
+-   숫자: `\\d` 또는 `[:digit:]`
+-   문자: `[:alpha:]`
+-   숫자 또는 문자: `[:alnum:]`
+-   0개 이상: `*`
+-   한 개 이상: `+`
+-   시작하는 단어: `^`
+-   끝나는 단어: `$`
+-   구두점 등의 특수문자: `[:punct:]` 또는 `[:symbol:]` 또는 `\\특수기호`
+
+```{r}
+#| warning: false
+library(data.table)
+library(stringr)
+library(stringi)
+```
+
+```{r}
+#| echo: false
+#| eval: true
+ascii <- stri_enc_fromutf32(1:127)
+paste0("Punct: ", paste0(stri_extract_all_regex(ascii, "[[:punct:]]")[[1]],collapse = " ")) |> print()
+paste0("Symbol: ",paste0(stri_extract_all_regex(ascii, "[[:symbol:]]")[[1]],collapse = " ")) |> print()
+```
+
+## 정규표현식 패키지 및 함수
+
+- 기본 함수 `grep`, `grepl`, `gsub`, `strsplit`
+- `stringr` 패키지 사용
+
+    -   `str_detect()` : 특정 단어 유무 확인 (T/F)
+    -   `str_replace()` : 특정 단어 변경
+    -   `str_extract()` : 특정 부분 추출
+    -   `str_split()`: 특정 규칙을 기준으로 데이터 분할
+
+## `str_detect()`
+
+-   `TRUE` / `FALSE` 결과 출력: 조건을 통한 새로운 행 만들기
+
+```{r}
+#| echo: true
+#| warning: false
+
+drug <- fread("hira_drug_htn.csv")
+str_detect(drug$comp_name,
+           pattern = "amlodipine") |> head()
+```
+
+```{r}
+#| echo: true
+drug[,alacepril_yn := fifelse(str_detect(comp_name,
+                                         "amlodipine"),1,0)][,.N, by=.(alacepril_yn)]
+```
+
+## `str_replace()`
+
+-   특정 규칙을 찾아 다른 문자로 대체하기
+
+```{r}
+#| echo: true
+drug[,head(comp_full)]
+drug[,comp_full2 := str_replace(string=comp_full,
+                                pattern = "\\(",
+                                replacement = "")]
+drug[,.(comp_full, comp_full2)] |> head()
+```
+
+-   `str_remove()`: 특정 규칙 제거
+
+```{r}
+#| echo: true
+drug[,comp_full2 := str_remove(string=comp_full2,
+                                pattern = "\\)")]
+drug[,.(comp_full, comp_full2)] |> head()
+```
+
+## `str_extract()`, `str_extract_all()`
+
+-   특정 단어 추출하기
+-   추출한 단어 기반으로 새로운 열을 만들기
+
+```{r}
+drug[,str_extract(comp_full, 
+                      pattern = "^amlodipine")] |> head()
+```
+
+## `str_split()`
+
+-   문자열 특성 상 공백, 특수기호로 구분되어 있음.
+-   이 규칙을 활용하여 하나의 컬럼을 여러 개로 나눌 수 있음.
+-   해당 규칙이 여러 개 있는 경우, `n`을 통해 개수 지정.
+
+```{r}
+drug[,str_split(string = comp_name,
+                pattern = " ",
+                n = 1, 
+                simplify = T)] |> head()
+
+drug[,str_split(string = comp_name,
+                pattern = " ",
+                n = 2, 
+                simplify = T)] |> head()
+```
+
+# 2. MICE
+
+## MICE의 개념
+
+-   MICE: Multiple Imputation by Chained Equations의 약자
+-   평균, 중앙값 등 단일값이 아닌 여러 변수를 고려한 값들 사용.
+-   데이터의 유형(type)별로 결측치 (NA) 대체.
+
+```{r}
+#| echo: false
+# mice <- fread("5주차_강의_데이터.csv", nrows = 1000)
+# target <- mice[,.SD,.SDcols=is.numeric] |> names()
+# mice[,(target) := lapply(.SD, \(x) replace(x, sample(length(x), .01*length(x)),NA)),.SDcols=target]
+# target <- mice[,sapply(mice, function(x) any(x %in% 'Yes')),with=F] |> names()
+# mice[,(target) := lapply(.SD, \(x) fifelse(x=="Yes",1,0) |> as.factor()),.SDcols = target]
+# 
+# fwrite(mice, "5주차_강의_데이터_mice.csv")
+```
+
+## MICE의 개념
+::: {.nonincremental}
+- mice를 이용한 분석의 흐름
+![](https://data.library.virginia.edu/files/figure1_mi.jpg){fig-align="center; width=500"}
+:::
+
+## 결측치 확인
+
+-   `md.pattern()`: NA 있는 열들의 규칙 시각화
+
+```{r}
+#| message: false
+#| echo: true
+dt <- fread("5주차_강의_데이터_mice.csv")
+
+library(mice)
+target <- dt[,.SD,.SDcols=c("BMI","SleepTime","PhysicalHealth","MentalHealth")] |> names()
+temp <- mice::md.pattern(dt[,..target], plot=T, rotate.names = T)
+```
+
+## multiple imputation
+
+```{r}
+imp <- mice(dt, printFlag=F)
+imp
+```
+
+-   `NA`를 대체하는 다양한 방법 존재
+
+```{r}
+#| warning: false
+methods(mice)
+```
+
+## Modeling
+- `NA`가 제거된 데이터를 활용해 모델링 진행
+
+```{r}
+fit <- with(imp, glm(HeartDisease  ~ BMI + PhysicalHealth + MentalHealth + SleepTime, family="binomial"))
+fit
+```
+
+## `pool()`
+- modeling한 결과를 합침.
+
+```{r}
+#| echo: true
+result <- pool(fit)
+summary(result, conf.int = T, exponentiate = T)
+```
+
+## 데이터 추출
+- `complete()`: imputed된 데이터를 추출.
+
+```{r}
+dt_imp <- complete(imp) |> setDT()
+```
+
+# 3. `gtsummary`
+
+## 패키지 소개
+
+![](https://www.danieldsjoberg.com/gtsummary/logo.png){fig-align="center" width="350"}
+
+데이터 요약 & 회귀분석 결과 테이블 만들기
+
+## 필요한 패키지 설치
+
+```{r}
+#| eval: false
+#| echo: true
+pkgs <- c("gtsummary","gt")
+install.packages(pkgs)
+library(gtsummary)
+library(gt)
+```
+
+```{r}
+#| echo: false
+library(gtsummary)
+library(gt)
+```
+
+
+## Baseline characteristics
+
+-   data의 일반 특성 요약
+-   집단 별 통계량 표시
+
+## 기본 테이블 {.smaller}
+
+```{r warning=FALSE}
+#| echo: true
+#| code-line-numbers: "|3|4|6|"
+#| output-location: column-fragment
+library(gtsummary)
+library(gt)
+tbl_summary(
+  data = dt_imp,
+  by = HeartDisease
+) |> 
+  add_overall() |> 
+  as_gt() |> 
+  as_raw_html()
+```
+
+## 통계량 변경 {.smaller}
+
+```{r}
+#| code-line-numbers: "|4|5-7|8-11|12-15|16|"
+#| output-location: column-fragment
+tbl_summary(
+  data = dt_imp,
+  by = HeartDisease,
+  include = c(Sex, BMI, Smoking, AlcoholDrinking, Stroke, Diabetic),
+  type = list(
+    c(Smoking, AlcoholDrinking, Stroke, Diabetic)~ "categorical"
+  ),
+  statistic = list(
+    all_continuous() ~"{mean} ± {sd}",
+    all_categorical() ~ "{n} ({p})"
+  ),
+  digits = list(
+    all_continuous() ~ 1,
+    all_categorical() ~ c(0,1)
+  ),
+  missing = "no",
+) |> 
+  add_overall() |> 
+  as_gt() |> 
+  as_raw_html()
+```
+
+## P-value {.smaller}
+
+```{r}
+#| code-line-numbers: "|17-24|"
+#| output-location: column-fragment
+tbl_summary(
+   data = dt_imp,
+    by = HeartDisease,
+    include = c(Sex, BMI, Smoking, AlcoholDrinking, Stroke, Diabetic),
+  statistic = list(
+    all_continuous() ~"{mean} ± {sd}",
+    # statistic = "{median} ({p25}-{p75})",
+    all_categorical() ~ "{n} ({p})"
+  ),
+  digits = list(
+    all_continuous() ~ 1,
+    all_categorical() ~ c(0,1)
+  ),
+  missing = "no",
+) |> 
+  add_overall() |> 
+  add_p(
+    test = list(
+      all_continuous() ~ "t.test",
+      all_categorical() ~ "chisq.test"
+    ),
+    pvalue_fun = ~style_pvalue(., digits = 3)
+  ) |> 
+  as_gt() |> 
+  as_raw_html()
+```
+
+## Regression table {.smaller}
+
+### 1) 단변량 회귀분석(Univariable regression)
+
+```{r}
+#| output-location: column-fragment
+#| code-line-numbers: "|3-4|5|6|7|"
+uni_tbl <- tbl_uvregression(
+  data = dt_imp[,.(HeartDisease, Sex, BMI, Smoking, AlcoholDrinking, Stroke, Diabetic)],
+  method = glm,
+  method.args = list(family = binomial),
+  y = HeartDisease,
+  exponentiate = T,
+  hide_n = T
+  ) |> 
+  modify_footnote(everything() ~ NA)
+uni_tbl |> 
+  as_gt() |> 
+  as_raw_html()
+```
+
+## Regression table {.smaller}
+
+### 2) 다변량 회귀분석(Multivariable regression)
+
+```{r}
+#| output-location: column-fragment
+#| code-line-numbers: "|1-2|6-7|10-12|13-17"
+fit <- glm(HeartDisease ~ Sex +  BMI + Smoking + AlcoholDrinking + Stroke + Diabetic, family=binomial, data = dt_imp)
+mult_tbl <- tbl_regression(
+  x = fit,
+  exponentiate = T, <- 
+  pvalue_fun = ~ style_pvalue(., digits = 3),
+  estimate_fun = ~style_ratio(., digits = 2)
+) |> 
+  bold_p() |> 
+  # modify_column_merge(pattern = "{estimate} ({conf.low}-{conf.high})",
+  #                     rows = !is.na(estimate)) |> 
+  add_significance_stars(hide_ci = T, hide_se = T) |> 
+  modify_header(
+    label = "**Variable**",
+    estimate = "**OR (95% CI)**",
+    p.value = "**P value**"
+  ) |> 
+  modify_footnote(everything() ~ NA)
+mult_tbl |> 
+  as_gt() |> 
+  as_raw_html()
+```
+
+## Regression table {.smaller}
+
+### 3) 두 개의 테이블 합치기
+
+```{r}
+#| code-line-numbers: "|2|3-4|"
+#| output-location: column-fragment
+tbl_merge(
+  list(uni_tbl, mult_tbl),
+  tab_spanner = 
+    c("**Univariable**", "**Multivariable**")
+) |> 
+  as_gt() |> 
+  as_raw_html()
+```
